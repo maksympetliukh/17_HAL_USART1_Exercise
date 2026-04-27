@@ -12,13 +12,17 @@ void SystemClock_Config(void);
 void USART1_Init(void);
 void Error_Handler(void);
 uint8_t conv_to_cap(uint8_t data);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 //USART Handle global variable
 UART_HandleTypeDef huart1;
 
-//user data
-char *tx = "The application is running.\r\n";
+//global dara variables and flags
+char *initial_message = "IRQ USART1 test application is running.\r\n";
 uint8_t rx;
+uint8_t rx_buf[100];
+uint32_t count = 0;
+uint8_t rx_cmplt = 0;
 
 int main(void) {
     //Required HAL, Clock and USART peripheral initializations
@@ -26,26 +30,26 @@ int main(void) {
     SystemClock_Config();
     USART1_Init();
 
-    //Transmit the data
-    HAL_UART_Transmit(&huart1,  (uint8_t *)tx, strlen(tx), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1, (uint8_t*)initial_message, strlen(initial_message), HAL_MAX_DELAY);
 
-    //Receive the data from user's input
-    uint8_t rx_buf[100];
-    uint32_t count = 0;
-
-    while (1) {
-        HAL_UART_Receive(&huart1, &rx, 1, HAL_MAX_DELAY);
-        if (rx == '\r') {
-            break;
-        }else {
-            rx_buf[count++] = conv_to_cap(rx);
-        }
+    while (rx_cmplt != 1) {
+        HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx, 1);
     }
-        rx_buf[count++] = '\r';
-        HAL_UART_Transmit(&huart1, rx_buf, count, HAL_MAX_DELAY);
+
     while (1);
 
     return 0;
+}
+
+//Receive Complete event Application Callback
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (rx == '\r') {
+        rx_cmplt = 1;
+        rx_buf[count++] = '\r';
+        HAL_UART_Transmit(&huart1, rx_buf, count, HAL_MAX_DELAY);
+    }else {
+        rx_buf[count++] = conv_to_cap(rx);
+    }
 }
 
 void SystemClock_Config(void) {
